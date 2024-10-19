@@ -1,7 +1,9 @@
+<p align="center">
+    <img src="https://tinyurl.com/yw84dqs6">
+</p>
 # Asta-MD
 A cool WhatsApp bot made by asta ichiyukimøri
 
-![Asta WhatsApp Bot Logo](https://tinyurl.com/yw84dqs6)
 
 A powerful WhatsApp bot built using Baileys.
 
