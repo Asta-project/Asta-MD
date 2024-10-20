@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
 import { makeWASocket, Browsers, fetchLatestBaileysVersion, DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
-import { Handler, Callupdate, GroupUpdate } from './event/index.js';
+import { Handler, Callupdate, GroupUpdate } from './src/event/index.js';
+import CommandHandler from './src/CommandHandler';
 import express from 'express';
 import pino from 'pino';
 import fs from 'fs';
@@ -10,8 +12,8 @@ import path from 'path';
 import chalk from 'chalk';
 import moment from 'moment-timezone';
 import axios from 'axios';
-import config from './config.js';
-import pkg from './lib/autoreact.js';
+import config from './src/config.cjs';
+import pkg from './src/lib/autoreact.cjs';
 
 const { emojis, doReact } = pkg;
 const sessionName = "session";
@@ -21,9 +23,11 @@ const lime = chalk.bold.hex("#32CD32");
 let useQR = false;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
+
 const MAIN_LOGGER = pino({ timestamp: () => `,"time":"${new Date().toJSON()}"` });
 const logger = MAIN_LOGGER.child({});
 logger.level = "trace";
+
 const msgRetryCounterCache = new NodeCache();
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
@@ -57,7 +61,8 @@ async function start() {
   try {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version, isLatest } = await fetchLatestBaileysVersion();
-    console.log(` Ethix-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
+    console.log(` using WA v${version.join('.')}, isLatest: ${isLatest}`);
+
     const Matrix = makeWASocket({
       version,
       logger: pino({ level: 'silent' }),
@@ -111,9 +116,25 @@ async function start() {
             await doReact(randomEmoji, mek, Matrix);
           }
         }
+
+        const commandHandler = new CommandHandler();
+        const commandName = chatUpdate.messages[0].text.slice(config.PREFIX.length).trim().split(' ')[0];
+        const args = chatUpdate.messages[0].text.slice(config.PREFIX.length).trim().split(' ').slice(1);
+
+        if (chatUpdate.messages[0].text.startsWith(config.PREFIX)) {
+          commandHandler.executeCommand(Matrix, commandName, args, chatUpdate);
+        }
       } catch (err) {
-        console.error('Error during auto reaction:', err);
+        console.error('Error handling message:', err);
       }
+    });
+
+    app.get('/', (req, res) => {
+      res.send('WhatsApp Bot is running!');
+    });
+
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
     });
   } catch (error) {
     console.error('Critical Error:', error);
@@ -123,12 +144,12 @@ async function start() {
 
 async function init() {
   if (fs.existsSync(credsPath)) {
-    console.log(" Session file found, proceeding without QR code.");
+    console.log("Session file found, proceeding without QR code.");
     await start();
   } else {
     const sessionDownloaded = await downloadSessionData();
     if (sessionDownloaded) {
-      console.log(" Session downloaded, starting bot.");
+      console.log("Session downloaded, starting bot.");
       await start();
     } else {
       console.log("No session found or downloaded, QR code will be printed for authentication.");
@@ -139,11 +160,3 @@ async function init() {
 }
 
 init();
-
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
